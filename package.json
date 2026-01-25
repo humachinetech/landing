@@ -1,0 +1,24 @@
+{
+  "name": "landing-fullstack",
+  "version": "1.0.0",
+  "description": "Full stack landing page with React + Vite frontend and NestJS + GraphQL + MongoDB backend",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run start:dev",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "build:all": "npm run build:backend && npm run build:frontend"
+  },
+  "keywords": [
+    "react",
+    "vite",
+    "typescript",
+    "nestjs",
+    "graphql",
+    "mongodb"
+  ],
+  "author": "",
+  "license": "MIT"
+}
