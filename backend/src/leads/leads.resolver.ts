@@ -18,7 +18,7 @@ export class LeadsResolver {
     return this.leadsService.findAll();
   }
 
-  @Query(() => Lead, { name: 'lead' })
+  @Query(() => Lead, { name: 'lead', nullable: true })
   findOne(@Args('id', { type: () => ID }) id: string) {
     return this.leadsService.findOne(id);
   }

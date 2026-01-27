@@ -1,38 +1,49 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Lead, LeadDocument } from './schemas/lead.schema';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Lead } from './entities/lead.entity';
 import { CreateLeadInput } from './dto/create-lead.input';
 import { UpdateLeadInput } from './dto/update-lead.input';
 
 @Injectable()
 export class LeadsService {
-  constructor(@InjectModel(Lead.name) private leadModel: Model<LeadDocument>) {}
+  constructor(
+    @InjectRepository(Lead)
+    private readonly leadRepo: Repository<Lead>,
+  ) {}
 
   async create(createLeadInput: CreateLeadInput): Promise<Lead> {
-    const createdLead = new this.leadModel(createLeadInput);
-    return createdLead.save();
+    const lead = this.leadRepo.create(createLeadInput);
+    return this.leadRepo.save(lead);
   }
 
   async findAll(): Promise<Lead[]> {
-    return this.leadModel.find().exec();
+    return this.leadRepo.find({ order: { createdAt: 'DESC' } });
   }
 
-  async findOne(id: string): Promise<Lead> {
-    return this.leadModel.findById(id).exec();
+  async findOne(id: string): Promise<Lead | null> {
+    const n = parseInt(id, 10);
+    if (Number.isNaN(n)) return null;
+    return this.leadRepo.findOne({ where: { id: n } });
   }
 
-  async findByEmail(email: string): Promise<Lead> {
-    return this.leadModel.findOne({ email }).exec();
+  async findByEmail(email: string): Promise<Lead | null> {
+    return this.leadRepo.findOne({ where: { email } });
   }
 
   async update(id: string, updateLeadInput: UpdateLeadInput): Promise<Lead> {
-    return this.leadModel
-      .findByIdAndUpdate(id, updateLeadInput, { new: true })
-      .exec();
+    const n = parseInt(id, 10);
+    if (Number.isNaN(n)) throw new Error('Invalid id');
+    await this.leadRepo.update(n, updateLeadInput as Partial<Lead>);
+    const updated = await this.leadRepo.findOne({ where: { id: n } });
+    if (!updated) throw new Error('Lead not found');
+    return updated;
   }
 
   async remove(id: string): Promise<Lead> {
-    return this.leadModel.findByIdAndDelete(id).exec();
+    const lead = await this.findOne(id);
+    if (!lead) throw new Error('Lead not found');
+    await this.leadRepo.remove(lead);
+    return lead;
   }
 }
