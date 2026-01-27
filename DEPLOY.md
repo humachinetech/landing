@@ -1,6 +1,10 @@
 # Deploy to AWS EC2
 
-Deploy the landing app (React + NestJS + GraphQL + MongoDB) to EC2.
+Deploy the landing app (React + NestJS + GraphQL + MySQL) to EC2.
+
+**Auto-deploy on push:** see [DEPLOY-AUTOMATION.md](./DEPLOY-AUTOMATION.md) for GitHub Actions (push to `main` → deploy via SSH).
+
+---
 
 ## This instance (eu-north-1)
 
@@ -27,7 +31,7 @@ In EC2 → Security groups → inbound rules, allow:
 
 SSH in, then run these steps **in order**.
 
-### 1. Prereqs (Node, yarn, nginx, MongoDB)
+### 1. Prereqs (Node, yarn, nginx, MySQL)
 
 ```bash
 # Node 18+ (e.g. nvm)
@@ -42,7 +46,7 @@ npm install -g yarn pm2
 # Nginx (Ubuntu)
 sudo apt-get update && sudo apt-get install -y nginx
 
-# MongoDB: use a local install or a MongoDB Atlas URI in backend/.env
+# MySQL on port 3306: local install, RDS, or remote; set MYSQL_* in backend/.env
 ```
 
 ### 2. Clone repo
@@ -64,7 +68,7 @@ nano backend/.env   # or vim
 
 Set at least:
 
-- `MONGODB_URI` — e.g. `mongodb://localhost:27017/landing` or your Atlas URI
+- `MYSQL_HOST`, `MYSQL_PORT` (3306), `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`
 - `CORS_ORIGIN` — `http://<PUBLIC_IP>` (the EC2 Public IPv4, no trailing slash)
 
 Save and exit.
@@ -121,7 +125,11 @@ ssh -i your-key.pem ubuntu@<PUBLIC_IP> "cd /var/www/landing && git pull && ./dep
 |------------------|-----------|-------------|
 | `PORT`           | Backend   | Default 4000. Nginx proxies `/graphql` to this. |
 | `CORS_ORIGIN`    | Backend   | Allowed origin, e.g. `http://<ec2-ip>` or `https://yourdomain.com`. Must match the URL in the browser. |
-| `MONGODB_URI`    | Backend   | MongoDB connection string. |
+| `MYSQL_HOST`     | Backend   | MySQL host (default `localhost`). |
+| `MYSQL_PORT`     | Backend   | MySQL port (default `3306`). |
+| `MYSQL_USER`     | Backend   | MySQL user. |
+| `MYSQL_PASSWORD` | Backend   | MySQL password. |
+| `MYSQL_DATABASE` | Backend   | MySQL database (e.g. `landing`). |
 | `VITE_GRAPHQL_URI` | Frontend (build) | Use `/graphql` when frontend and API are on the same host (typical for EC2). |
 
 ---
@@ -157,3 +165,8 @@ ssh -i your-key.pem ubuntu@<PUBLIC_IP> "cd /var/www/landing && git pull && ./dep
   - `pm2 delete landing-backend`  
   - Ensure nothing else uses port 4000: `sudo lsof -i :4000`  
   - Start again: `cd /var/www/landing && ./deploy/deploy.sh`.
+
+- **MySQL connection refused / ECONNREFUSED**  
+  - MySQL must be reachable on port 3306 (local or RDS).  
+  - Check `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE` in `backend/.env`.  
+  - If MySQL is on another host, open port 3306 in that host’s security group for the EC2 IP.

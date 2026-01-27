@@ -11,7 +11,7 @@ cd "$ROOT"
 echo "1. Backend .env"
 if [ ! -f backend/.env ]; then
   cp env.example backend/.env
-  echo "   Created backend/.env — edit it: set MONGODB_URI and CORS_ORIGIN (e.g. http://<ec2-public-ip>)"
+  echo "   Created backend/.env — edit it: set MYSQL_* (port 3306) and CORS_ORIGIN (e.g. http://<ec2-public-ip>)"
   echo "   Then run: ./deploy/deploy.sh"
   echo ""
 fi

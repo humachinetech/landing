@@ -1,19 +1,28 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
-import { MongooseModule } from '@nestjs/mongoose';
 import { join } from 'path';
 import { LeadsModule } from './leads/leads.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
+    ConfigModule.forRoot({ isGlobal: true }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (config: ConfigService) => ({
+        type: 'mysql',
+        host: config.get('MYSQL_HOST', 'localhost'),
+        port: parseInt(config.get('MYSQL_PORT', '3306'), 10),
+        username: config.get('MYSQL_USER', 'root'),
+        password: config.get('MYSQL_PASSWORD', ''),
+        database: config.get('MYSQL_DATABASE', 'landing'),
+        autoLoadEntities: true,
+        synchronize: process.env.NODE_ENV !== 'production',
+      }),
+      inject: [ConfigService],
     }),
-    MongooseModule.forRoot(
-      process.env.MONGODB_URI || 'mongodb://localhost:27017/landing',
-    ),
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
