@@ -6,17 +6,32 @@ Push to `main` deploys to EC2 automatically.
 
 ## 1️⃣ Prepare EC2 (one-time)
 
-### Install tools
+If you see **`/var/www/landing: No such file or directory`** or **`pm2: command not found`**, the EC2 is still blank. Do this **once** on the instance (SSH as `ubuntu` or your user):
+
+### Option A — Bootstrap script (after cloning somewhere)
+
+If you already have the repo (e.g. in your home dir), run from the repo root:
 
 ```bash
-sudo apt update -y
-sudo apt install -y git nodejs npm nginx
-sudo npm install -g yarn pm2
-# Node 18+ recommended — use nvm if needed:
-# curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash && nvm install 18
+chmod +x deploy/bootstrap-ec2.sh
+./deploy/bootstrap-ec2.sh
 ```
 
-### Clone repo (path is fixed for Actions)
+### Option B — Copy-paste on a fresh EC2 (no repo yet)
+
+Run these blocks **in order** on the EC2 (e.g. in an SSH session):
+
+**1. Install git, nginx, Node 18, yarn, PM2**
+
+```bash
+sudo apt-get update -y
+sudo apt-get install -y git nginx curl
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+sudo npm install -g yarn pm2
+```
+
+**2. Create app dir and clone repo**
 
 ```bash
 sudo mkdir -p /var/www/landing
@@ -25,16 +40,16 @@ cd /var/www/landing
 git clone https://github.com/humachinetech/landing.git .
 ```
 
-⚠️ **Repo path must stay `/var/www/landing`** — the workflow and nginx config depend on it.
-
-### One-time app setup
+**3. Create backend env and run setup**
 
 ```bash
 cp env.example backend/.env
-# Edit backend/.env: MYSQL_* (host, port 3306, user, password, database), CORS_ORIGIN=http://<EC2_PUBLIC_IP>
+nano backend/.env   # set MYSQL_* (port 3306), CORS_ORIGIN=http://<EC2-PUBLIC-IP>
 chmod +x deploy/setup-ec2.sh deploy/deploy.sh
 ./deploy/setup-ec2.sh
 ```
+
+⚠️ **Repo path must stay `/var/www/landing`** — the workflow and nginx config depend on it.
 
 ---
 
