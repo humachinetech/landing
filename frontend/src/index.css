@@ -5,6 +5,23 @@
 }
 
 :root {
+  /* Theme: Teal & Amber */
+  --color-primary: #0d9488;
+  --color-primary-dark: #0f766e;
+  --color-accent: #f59e0b;
+  --color-accent-hover: #d97706;
+  --color-error: #dc2626;
+  --color-error-bg: rgba(220, 38, 38, 0.1);
+  --color-bg: #fafafa;
+  --color-bg-surface: #ffffff;
+  --color-bg-muted: #f0fdfa;
+  --color-text: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-border: #e2e8f0;
+  --color-footer-bg: #0f172a;
+  --color-footer-text: #94a3b8;
+
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
@@ -12,8 +29,8 @@
   font-weight: 400;
 
   color-scheme: light;
-  color: #333333;
-  background-color: #ffffff;
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -25,8 +42,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #ffffff;
-  color: #333333;
+  background-color: var(--color-bg);
+  color: var(--color-text-secondary);
 }
 
 #root {
