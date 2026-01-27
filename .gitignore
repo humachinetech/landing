@@ -12,6 +12,7 @@ backend/dist/
 .env.local
 .env.*.local
 backend/.env
+env
 
 # Logs
 *.log

@@ -1,101 +1,159 @@
 # Deploy to AWS EC2
 
-This guide covers deploying the landing app (React frontend + NestJS backend) to AWS EC2.
+Deploy the landing app (React + NestJS + GraphQL + MongoDB) to EC2.
 
-## Prerequisites on EC2
+## This instance (eu-north-1)
 
-- Ubuntu 22.04 (or similar)
-- Node.js 18+ (e.g. via [nvm](https://github.com/nvm-sh/nvm))
-- MongoDB (local or Atlas connection string in `.env`)
-- Nginx
-- PM2: `npm install -g pm2`
+- **Region:** eu-north-1 (Stockholm)
+- **Instance ID:** `i-07e45185a63d7d1c2`
+- **Console:** [EC2 Instance Details](https://eu-north-1.console.aws.amazon.com/ec2/home?region=eu-north-1#InstanceDetails:instanceId=i-07e45185a63d7d1c2)
 
-## One-time EC2 setup
+In the console, note the **Public IPv4 address**. You need it for SSH, `CORS_ORIGIN`, and for opening the app in a browser.
 
-### 1. Clone repo and install deps
+---
+
+## Security group (required)
+
+In EC2 → Security groups → inbound rules, allow:
+
+| Type   | Port | Source     |
+|--------|------|------------|
+| SSH    | 22   | Your IP    |
+| HTTP   | 80   | 0.0.0.0/0  |
+
+---
+
+## One-time setup on EC2
+
+SSH in, then run these steps **in order**.
+
+### 1. Prereqs (Node, yarn, nginx, MongoDB)
+
+```bash
+# Node 18+ (e.g. nvm)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+source ~/.bashrc
+nvm install 18
+nvm use 18
+
+# Yarn and PM2
+npm install -g yarn pm2
+
+# Nginx (Ubuntu)
+sudo apt-get update && sudo apt-get install -y nginx
+
+# MongoDB: use a local install or a MongoDB Atlas URI in backend/.env
+```
+
+### 2. Clone repo
 
 ```bash
 sudo mkdir -p /var/www/landing
 sudo chown $USER:$USER /var/www/landing
 cd /var/www/landing
-git clone <your-repo-url> .
-# Or clone into a subdir and copy; adjust paths below accordingly
+git clone https://github.com/humachinetech/landing.git .
+# Or: git clone git@github.com:humachinetech/landing.git .
 ```
 
-### 2. Backend environment
+### 3. Backend env
 
 ```bash
-cd /var/www/landing/backend
-cp ../../env.example .env
-# Edit .env: set MONGODB_URI, CORS_ORIGIN (e.g. https://yourdomain.com or http://<ec2-public-ip>)
+cp env.example backend/.env
+nano backend/.env   # or vim
 ```
 
-### 3. Nginx
+Set at least:
+
+- `MONGODB_URI` — e.g. `mongodb://localhost:27017/landing` or your Atlas URI
+- `CORS_ORIGIN` — `http://<PUBLIC_IP>` (the EC2 Public IPv4, no trailing slash)
+
+Save and exit.
+
+### 4. Run one-time setup script
 
 ```bash
-sudo cp /var/www/landing/deploy/nginx.conf /etc/nginx/sites-available/landing
-sudo ln -s /etc/nginx/sites-available/landing /etc/nginx/sites-enabled/
-# Edit server_name if you use a domain
-sudo nginx -t && sudo systemctl reload nginx
+cd /var/www/landing
+chmod +x deploy/setup-ec2.sh deploy/deploy.sh
+./deploy/setup-ec2.sh
 ```
 
-### 4. PM2 and backend
+This configures nginx, builds backend + frontend, and starts the backend with PM2. If you had not created `backend/.env` before, it will tell you to create it and then run `./deploy/deploy.sh`.
+
+### 5. Verify
 
 ```bash
-cd /var/www/landing/backend
-yarn install
-yarn build
-pm2 start dist/main.js --name landing-backend
-pm2 save
-pm2 startup  # run the command it prints to start on boot
+pm2 status                    # landing-backend should be “online”
+curl -s http://127.0.0.1:4000/graphql -H "Content-Type: application/json" -d '{"query":"{ __typename }"}'  # should return {"data":{"__typename":"Query"}}
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1/   # should be 200
 ```
 
-### 5. Frontend build (production API URL)
+Then open **http://\<PUBLIC_IP\>** in a browser. You should see the landing page; the “Get Started” form talks to `/graphql` via nginx.
+
+---
+
+## Deploying updates
+
+On your machine:
 
 ```bash
-cd /var/www/landing/frontend
-VITE_GRAPHQL_URI=/graphql yarn build
-# Nginx serves from /var/www/landing/frontend/dist
+git add -A && git commit -m "Your message" && git push
 ```
 
-## Deploying updates (push → deploy on EC2)
-
-### From your machine: push changes
-
-```bash
-git add -A
-git commit -m "Your message"
-git push
-```
-
-### On EC2: pull and run deploy script
+On EC2:
 
 ```bash
 cd /var/www/landing
 git pull
-chmod +x deploy/deploy.sh
 ./deploy/deploy.sh
 ```
 
-The script builds backend and frontend, restarts the backend with PM2, and leaves frontend assets in `frontend/dist` for Nginx to serve.
+Or in one go from your machine (replace key and IP):
+
+```bash
+ssh -i your-key.pem ubuntu@<PUBLIC_IP> "cd /var/www/landing && git pull && ./deploy/deploy.sh"
+```
+
+---
 
 ## Environment variables
 
-| Variable | Where | Description |
-|----------|--------|-------------|
-| `PORT` | Backend | Server port (default 4000). Nginx proxies `/graphql` to this. |
-| `CORS_ORIGIN` | Backend | Allowed origin (e.g. `https://yourdomain.com` or `http://<ec2-ip>`). |
-| `MONGODB_URI` | Backend | MongoDB connection string. |
-| `VITE_GRAPHQL_URI` | Frontend build | GraphQL endpoint. Use `/graphql` when frontend and API are same origin. |
+| Variable         | Where     | Description |
+|------------------|-----------|-------------|
+| `PORT`           | Backend   | Default 4000. Nginx proxies `/graphql` to this. |
+| `CORS_ORIGIN`    | Backend   | Allowed origin, e.g. `http://<ec2-ip>` or `https://yourdomain.com`. Must match the URL in the browser. |
+| `MONGODB_URI`    | Backend   | MongoDB connection string. |
+| `VITE_GRAPHQL_URI` | Frontend (build) | Use `/graphql` when frontend and API are on the same host (typical for EC2). |
 
-## Optional: deploy from your machine via SSH
-
-```bash
-ssh -i your-key.pem ubuntu@<ec2-ip> "cd /var/www/landing && git pull && ./deploy/deploy.sh"
-```
+---
 
 ## Troubleshooting
 
-- **502 Bad Gateway**: Backend not running or wrong port. Check `pm2 status` and `PORT` in backend `.env`.
-- **GraphQL fails**: Ensure `CORS_ORIGIN` matches the origin the browser uses (scheme + host + port).
-- **Blank page**: Confirm frontend was built with `VITE_GRAPHQL_URI=/graphql` and Nginx `root` points at `frontend/dist`.
+- **502 Bad Gateway**  
+  Backend not running or wrong port.  
+  - `pm2 status` — `landing-backend` should be online.  
+  - `pm2 logs landing-backend` — look for bind/port errors.  
+  - Backend `.env`: `PORT=4000` (or whatever nginx proxies to).
+
+- **GraphQL / CORS errors in browser**  
+  `CORS_ORIGIN` must match the origin (scheme + host, no port if 80/443).  
+  - If you use `http://13.48.x.x`, set `CORS_ORIGIN=http://13.48.x.x`.  
+  - No trailing slash.
+
+- **Blank or broken page**  
+  - Frontend must be built with `VITE_GRAPHQL_URI=/graphql` (deploy script does this).  
+  - Nginx `root` must be `/var/www/landing/frontend/dist`.  
+  - `ls /var/www/landing/frontend/dist` should show `index.html` and assets.
+
+- **“Cannot GET /graphql”**  
+  Nginx is not proxying. Check:  
+  - `/etc/nginx/sites-enabled/landing` exists and has `location /graphql { proxy_pass http://127.0.0.1:4000; ... }`.  
+  - `sudo nginx -t && sudo systemctl reload nginx`.
+
+- **Default nginx page instead of app**  
+  Disable default site:  
+  - `sudo rm -f /etc/nginx/sites-enabled/default && sudo systemctl reload nginx`.
+
+- **Backend exits or “EADDRINUSE”**  
+  - `pm2 delete landing-backend`  
+  - Ensure nothing else uses port 4000: `sudo lsof -i :4000`  
+  - Start again: `cd /var/www/landing && ./deploy/deploy.sh`.
